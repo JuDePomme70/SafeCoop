@@ -12,6 +12,7 @@ library, process-launching code, dynamic assembly loading, or raw-memory access.
 - Replays received commands only on the game's input-update thread and prevents echo loops.
 - Retries a guest connection while the host is loading and keeps the host ready after a peer disconnects.
 - Includes a Windows launcher that installs/configures the mod, produces a host/join code, and shows connection/join/leave status.
+- Launcher 0.4.1 and later checks the public GitHub release on startup. It offers one-click updates and verifies the published SHA-256 before replacing itself.
 
 This is still experimental multiplayer software. Use only a copied test save,
 keep backups, and do not expect every command family to be reliable yet.

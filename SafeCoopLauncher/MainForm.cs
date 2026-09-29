@@ -11,15 +11,20 @@ namespace SafeCoopLauncher;
 
 internal sealed class MainForm : Form {
     private const int DefaultPort = 27960;
+    private const string LauncherVersion = "0.4.1";
+    private static readonly Version ParsedLauncherVersion = Version.Parse(LauncherVersion);
     private readonly TextBox hostAddress = new() { ReadOnly = true, Dock = DockStyle.Top };
     private readonly TextBox joinCode = new() { ReadOnly = true, Dock = DockStyle.Top };
     private readonly TextBox pastedJoinCode = new() { Dock = DockStyle.Top, PlaceholderText = "Colle ici le code re?u de l?h?te" };
     private readonly Label status = new() { AutoSize = false, Height = 50, Dock = DockStyle.Bottom, TextAlign = ContentAlignment.MiddleLeft };
+    private readonly Button updateButton = new() { Text = "V?rification des mises ? jour?", Dock = DockStyle.Bottom, Height = 32, Enabled = false };
     private readonly System.Windows.Forms.Timer sessionStatusTimer = new() { Interval = 1000 };
     private readonly NotifyIcon sessionNotifier = new() { Icon = System.Drawing.SystemIcons.Application, Visible = true };
     private long latestStatusTicks;
     private string latestStatusState = string.Empty;
     private bool watchSessionStatus;
+    private LauncherRelease? availableUpdate;
+    private bool updateCheckInProgress;
 
     public MainForm() {
         Text = "SafeCoop Launcher";
@@ -34,9 +39,11 @@ internal sealed class MainForm : Form {
 
         var launchButton = new Button { Text = "Lancer Captain of Industry", Dock = DockStyle.Bottom, Height = 38 };
         launchButton.Click += (_, _) => LaunchGame();
+        updateButton.Click += async (_, _) => await InstallUpdateAsync();
 
         Controls.Add(tabs);
         Controls.Add(status);
+        Controls.Add(updateButton);
         Controls.Add(launchButton);
         RefreshHostAddress();
         SetStatus("Pr?t. Ferme le jeu avant de pr?parer une session.");
@@ -45,6 +52,7 @@ internal sealed class MainForm : Form {
             sessionStatusTimer.Dispose();
             sessionNotifier.Dispose();
         };
+        Shown += async (_, _) => await CheckForUpdatesAsync();
     }
 
     private TabPage CreateHostPage() {
@@ -292,6 +300,53 @@ internal sealed class MainForm : Form {
             UseShellExecute = true,
             WorkingDirectory = Path.GetDirectoryName(game)!,
         });
+    }
+
+    private async Task CheckForUpdatesAsync() {
+        if (updateCheckInProgress) {
+            return;
+        }
+
+        updateCheckInProgress = true;
+        updateButton.Enabled = false;
+        updateButton.Text = "V?rification des mises ? jour?";
+        try {
+            availableUpdate = await LauncherUpdater.GetLatestReleaseAsync(ParsedLauncherVersion);
+            if (availableUpdate == null) {
+                updateButton.Text = $"Launcher ? jour (v{LauncherVersion})";
+                return;
+            }
+
+            updateButton.Text = $"Installer la mise ? jour v{availableUpdate.Version}";
+            updateButton.Enabled = true;
+        }
+        catch {
+            updateButton.Text = "V?rifier les mises ? jour";
+            updateButton.Enabled = true;
+        }
+        finally {
+            updateCheckInProgress = false;
+        }
+    }
+
+    private async Task InstallUpdateAsync() {
+        if (availableUpdate == null) {
+            await CheckForUpdatesAsync();
+            return;
+        }
+
+        updateButton.Enabled = false;
+        updateButton.Text = "T?l?chargement de la mise ? jour?";
+        try {
+            await LauncherUpdater.PrepareAndStartUpdateAsync(availableUpdate);
+            SetStatus("Mise ? jour v?rifi?e. Le launcher red?marre?");
+            Close();
+        }
+        catch (Exception exception) {
+            updateButton.Text = "R?essayer la mise ? jour";
+            updateButton.Enabled = true;
+            SetStatus($"Mise ? jour impossible : {exception.Message}");
+        }
     }
 
     private void SetStatus(string message) {
