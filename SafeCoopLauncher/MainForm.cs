@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace SafeCoopLauncher;
 
@@ -14,6 +15,11 @@ internal sealed class MainForm : Form {
     private readonly TextBox joinCode = new() { ReadOnly = true, Dock = DockStyle.Top };
     private readonly TextBox pastedJoinCode = new() { Dock = DockStyle.Top, PlaceholderText = "Colle ici le code re?u de l?h?te" };
     private readonly Label status = new() { AutoSize = false, Height = 50, Dock = DockStyle.Bottom, TextAlign = ContentAlignment.MiddleLeft };
+    private readonly System.Windows.Forms.Timer sessionStatusTimer = new() { Interval = 1000 };
+    private readonly NotifyIcon sessionNotifier = new() { Icon = System.Drawing.SystemIcons.Application, Visible = true };
+    private long latestStatusTicks;
+    private string latestStatusState = string.Empty;
+    private bool watchSessionStatus;
 
     public MainForm() {
         Text = "SafeCoop Launcher";
@@ -34,6 +40,11 @@ internal sealed class MainForm : Form {
         Controls.Add(launchButton);
         RefreshHostAddress();
         SetStatus("Pr?t. Ferme le jeu avant de pr?parer une session.");
+        sessionStatusTimer.Tick += (_, _) => RefreshSessionStatus();
+        FormClosed += (_, _) => {
+            sessionStatusTimer.Dispose();
+            sessionNotifier.Dispose();
+        };
     }
 
     private TabPage CreateHostPage() {
@@ -61,7 +72,7 @@ internal sealed class MainForm : Form {
             }
         };
         panel.Controls.Add(copy);
-        panel.Controls.Add(CreateLabel("3. Lance le jeu et ouvre la sauvegarde de test partag?e."));
+        panel.Controls.Add(CreateLabel("3. Laisse ce launcher ouvert : il t'indiquera quand ton pote rejoint ou quitte."));
         page.Controls.Add(panel);
         return page;
     }
@@ -75,7 +86,7 @@ internal sealed class MainForm : Form {
         var prepare = new Button { Text = "Pr?parer ma connexion", AutoSize = true };
         prepare.Click += (_, _) => PrepareGuest();
         panel.Controls.Add(prepare);
-        panel.Controls.Add(CreateLabel("2. Lance le jeu et ouvre exactement la sauvegarde fournie par l?h?te."));
+        panel.Controls.Add(CreateLabel("2. Lance le jeu avec la m?me sauvegarde de test que l'h?te."));
         panel.Controls.Add(CreateLabel("Le lanceur installe le bon mod et r?gle la connexion ; il ne copie ni n?envoie aucune sauvegarde."));
         page.Controls.Add(panel);
         return page;
@@ -112,6 +123,7 @@ internal sealed class MainForm : Form {
         try {
             InstallAndConfigure(address, DefaultPort, code);
             joinCode.Text = $"SC1;{address};{DefaultPort};{code}";
+            StartWatchingSessionStatus();
             SetStatus("Ta partie est pr?te. Copie le code pour ton pote, puis lance le jeu.");
         }
         catch (Exception exception) {
@@ -127,6 +139,7 @@ internal sealed class MainForm : Form {
 
         try {
             InstallAndConfigure(address, port, code);
+            StartWatchingSessionStatus();
             SetStatus("Connexion pr?te. Lance le jeu et ouvre la m?me sauvegarde que l?h?te.");
         }
         catch (Exception exception) {
@@ -146,6 +159,7 @@ internal sealed class MainForm : Form {
         }
 
         File.WriteAllText(Path.Combine(target, "config.json"), CreateConfig(host, port, code), new UTF8Encoding(false));
+        WriteLauncherSessionStatus("Preparing", "Configuration termin?e. Lance Captain of Industry.");
     }
 
     private static void WriteEmbeddedPayload(string fileName, string destination) {
@@ -168,6 +182,63 @@ internal sealed class MainForm : Form {
           "session_code": { "default": "{{code}}", "max_length": 64, "description": "Private SafeCoop session code." }
         }
         """;
+    }
+
+    private static string SessionStatusFilePath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "Captain of Industry", "Mods", "SafeCoop", "session-status.json");
+
+    private static void WriteLauncherSessionStatus(string state, string message) {
+        var json = JsonSerializer.Serialize(new {
+            state,
+            message,
+            updatedUtcTicks = DateTime.UtcNow.Ticks,
+        });
+        File.WriteAllText(SessionStatusFilePath, json, new UTF8Encoding(false));
+    }
+
+    private void StartWatchingSessionStatus() {
+        latestStatusTicks = 0;
+        latestStatusState = string.Empty;
+        watchSessionStatus = true;
+        sessionStatusTimer.Start();
+        RefreshSessionStatus();
+    }
+
+    private void RefreshSessionStatus() {
+        if (!watchSessionStatus || !File.Exists(SessionStatusFilePath)) {
+            return;
+        }
+
+        try {
+            using var document = JsonDocument.Parse(File.ReadAllText(SessionStatusFilePath));
+            var root = document.RootElement;
+            if (!root.TryGetProperty("updatedUtcTicks", out var ticksValue) || !ticksValue.TryGetInt64(out var ticks) || ticks <= latestStatusTicks ||
+                !root.TryGetProperty("state", out var stateValue) || !root.TryGetProperty("message", out var messageValue)) {
+                return;
+            }
+
+            var state = stateValue.GetString() ?? string.Empty;
+            var message = messageValue.GetString() ?? string.Empty;
+            latestStatusTicks = ticks;
+            SetStatus(message);
+
+            if (!string.Equals(state, latestStatusState, StringComparison.Ordinal) &&
+                (string.Equals(state, "Connected", StringComparison.Ordinal) ||
+                 string.Equals(state, "PeerDisconnected", StringComparison.Ordinal) ||
+                 string.Equals(state, "Failed", StringComparison.Ordinal) ||
+                 string.Equals(state, "Stopped", StringComparison.Ordinal))) {
+                sessionNotifier.ShowBalloonTip(5000, "SafeCoop", message, ToolTipIcon.Info);
+            }
+
+            latestStatusState = state;
+        }
+        catch (IOException) {
+            // The mod is updating the tiny status file; the next timer tick will retry.
+        }
+        catch (JsonException) {
+            // Ignore a partially written status update and retry on the next tick.
+        }
     }
 
     private static IPAddress? FindTailscaleAddress() {

@@ -32,7 +32,7 @@ public sealed class SafeCoopMod : IMod, IDisposable {
     public SafeCoopMod(ModManifest manifest) {
         this.manifest = manifest;
         jsonConfig = new ModJsonConfig(this);
-        Log.Info("SafeCoop 0.3.1 loaded.");
+        Log.Info("SafeCoop 0.4.0 loaded.");
     }
 
     public ModManifest Manifest => manifest;
@@ -56,6 +56,7 @@ public sealed class SafeCoopMod : IMod, IDisposable {
         if (!LanSessionSettings.TryCreate(jsonConfig, out var settings, out var message)) {
             if (!string.IsNullOrEmpty(message)) {
                 Log.Warning(message);
+                SessionStatusReporter.Publish(SessionStatus.Failed, message);
             }
             return;
         }
@@ -79,6 +80,7 @@ public sealed class SafeCoopMod : IMod, IDisposable {
         // LastSaveFilePath is populated only after this mod's Initialize call.
         // Starting here used to prevent every real session from ever opening.
         pendingSessionSettings = settings;
+        SessionStatusReporter.Publish(SessionStatus.WaitingForSave, "Chargement de la sauvegarde de session?");
         Log.Info("SafeCoop is configured and waiting for the selected save to finish loading.");
     }
 
@@ -145,7 +147,12 @@ public sealed class SafeCoopMod : IMod, IDisposable {
             }
 
             var saveFingerprint = Protocol.SessionFingerprint.FromFile(savePath);
-            lanSession = new LanSessionCoordinator(pendingSessionSettings, saveFingerprint, Log.Info, Log.Warning);
+            lanSession = new LanSessionCoordinator(
+                pendingSessionSettings,
+                saveFingerprint,
+                Log.Info,
+                Log.Warning,
+                SessionStatusReporter.Publish);
             pendingSessionSettings = null;
             lanSession.Start();
         }

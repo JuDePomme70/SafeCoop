@@ -1,4 +1,4 @@
-SafeCoop Prototype 0.3.1
+SafeCoop Prototype 0.4.0
 ========================
 
 This is an open-source development build. It is not playable co-op yet.
@@ -11,6 +11,8 @@ What this build does
 - Binds only to the configured Tailscale address; it never opens a router port or cloud server.
 - Captures save-affecting actions at scheduling time, serializes them with the game's own serializer, and sends a bounded in-memory payload to the verified peer.
 - Applies a received action only on the game's input-update thread and never sends it back to its origin.
+- Keeps the host waiting after a disconnect and makes a joining player retry while the host is loading.
+- Reports local session state to the SafeCoop launcher: waiting, connected, disconnected, or refused.
 
 What this build does not do
 ---------------------------
