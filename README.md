@@ -5,7 +5,7 @@ Captain of Industry. It uses the game's official Mods loader and direct,
 opt-in Tailscale networking?no router port, cloud game server, account, native
 library, process-launching code, dynamic assembly loading, or raw-memory access.
 
-## Current state: 0.3.0
+## Current state: 0.3.1
 
 - Verifies both peers use the same game version, SafeCoop version, session code, and SHA-256 fingerprint of the selected save.
 - Captures save-affecting commands at scheduling time and sends bounded, in-memory payloads to one verified peer.

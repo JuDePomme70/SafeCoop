@@ -1,4 +1,4 @@
-SafeCoop Prototype 0.3.0
+SafeCoop Prototype 0.3.1
 ========================
 
 This is an open-source development build. It is not playable co-op yet.

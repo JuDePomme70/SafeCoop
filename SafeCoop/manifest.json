@@ -1,6 +1,6 @@
 {
   "id": "SafeCoop",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "display_name": "SafeCoop Prototype",
   "description_short": "Experimental open-source co-op with opt-in Tailscale action synchronization.",
   "authors": ["LSPFR"],

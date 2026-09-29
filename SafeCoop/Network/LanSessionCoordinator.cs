@@ -16,7 +16,7 @@ namespace SafeCoop.Network;
 /// </summary>
 public sealed class LanSessionCoordinator : IDisposable {
     private const string GameVersion = "0.8.7d";
-    private const string ModVersion = "0.3.0";
+    private const string ModVersion = "0.3.1";
 
     private readonly LanSessionSettings settings;
     private readonly Action<string> info;

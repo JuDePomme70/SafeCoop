@@ -26,12 +26,13 @@ public sealed class SafeCoopMod : IMod, IDisposable {
     private InputScheduler? inputScheduler;
     private Event<IInputCommand>? scheduledCommandsEvent;
     private IGameLoopEvents? gameLoopEvents;
+    private LanSessionSettings? pendingSessionSettings;
     private bool applyingRemoteCommand;
 
     public SafeCoopMod(ModManifest manifest) {
         this.manifest = manifest;
         jsonConfig = new ModJsonConfig(this);
-        Log.Info("SafeCoop 0.3.0 loaded. Tailscale sessions are disabled until configured in mod settings.");
+        Log.Info("SafeCoop 0.3.1 loaded.");
     }
 
     public ModManifest Manifest => manifest;
@@ -59,21 +60,6 @@ public sealed class SafeCoopMod : IMod, IDisposable {
             return;
         }
 
-        string saveFingerprint;
-        try {
-            var savePath = resolver.Resolve<SaveManager>().LastSaveFilePath.ValueOrNull;
-            if (string.IsNullOrWhiteSpace(savePath) || !File.Exists(savePath)) {
-                Log.Warning("SafeCoop needs the currently loaded save file before it can start a session.");
-                return;
-            }
-
-            saveFingerprint = Protocol.SessionFingerprint.FromFile(savePath);
-        }
-        catch (Exception exception) {
-            Log.Warning($"SafeCoop could not verify the selected save: {exception.Message}");
-            return;
-        }
-
         this.resolver = resolver;
         inputScheduler = resolver.Resolve<InputScheduler>();
         // The scheduler exposes this hook at runtime, but the current modding
@@ -90,8 +76,10 @@ public sealed class SafeCoopMod : IMod, IDisposable {
 
         scheduledCommandsEvent.AddNonSaveable(this, OnCommandScheduled);
         gameLoopEvents.InputUpdate.AddNonSaveable(this, OnInputUpdate);
-        lanSession = new LanSessionCoordinator(settings!, saveFingerprint, Log.Info, Log.Warning);
-        lanSession.Start();
+        // LastSaveFilePath is populated only after this mod's Initialize call.
+        // Starting here used to prevent every real session from ever opening.
+        pendingSessionSettings = settings;
+        Log.Info("SafeCoop is configured and waiting for the selected save to finish loading.");
     }
 
     public void MigrateJsonConfig(VersionSlim savedVersion, Dict<string, object> savedValues) {
@@ -100,6 +88,7 @@ public sealed class SafeCoopMod : IMod, IDisposable {
 
     public void Dispose() {
         ClearGameHooks();
+        pendingSessionSettings = null;
         lanSession?.Dispose();
         lanSession = null;
         Log.Info("SafeCoop session closed.");
@@ -122,6 +111,8 @@ public sealed class SafeCoopMod : IMod, IDisposable {
     }
 
     private void OnInputUpdate(GameTime gameTime) {
+        TryStartSessionAfterSaveLoad();
+
         if (lanSession == null || inputScheduler == null || resolver == null) {
             return;
         }
@@ -139,6 +130,29 @@ public sealed class SafeCoopMod : IMod, IDisposable {
             finally {
                 applyingRemoteCommand = false;
             }
+        }
+    }
+
+    private void TryStartSessionAfterSaveLoad() {
+        if (lanSession != null || pendingSessionSettings == null || resolver == null) {
+            return;
+        }
+
+        try {
+            var savePath = resolver.Resolve<SaveManager>().LastSaveFilePath.ValueOrNull;
+            if (string.IsNullOrWhiteSpace(savePath) || !File.Exists(savePath)) {
+                return;
+            }
+
+            var saveFingerprint = Protocol.SessionFingerprint.FromFile(savePath);
+            lanSession = new LanSessionCoordinator(pendingSessionSettings, saveFingerprint, Log.Info, Log.Warning);
+            pendingSessionSettings = null;
+            lanSession.Start();
+        }
+        catch (Exception exception) {
+            // The game may expose the SaveManager before the file is fully ready.
+            // Keep waiting rather than turning a short load delay into a failed session.
+            Log.Warning($"SafeCoop is waiting for the selected save: {exception.Message}");
         }
     }
 
