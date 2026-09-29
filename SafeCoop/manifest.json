@@ -1,0 +1,13 @@
+{
+  "id": "SafeCoop",
+  "version": "0.3.0",
+  "display_name": "SafeCoop Prototype",
+  "description_short": "Experimental open-source co-op with opt-in Tailscale action synchronization.",
+  "authors": ["LSPFR"],
+  "primary_dlls": ["SafeCoop.dll"],
+  "min_game_version": "0.8.7",
+  "max_verified_game_version": "0.8.7d",
+  "can_add_to_saved_game": true,
+  "can_remove_from_saved_game": true,
+  "non_locking_dll_load": true
+}

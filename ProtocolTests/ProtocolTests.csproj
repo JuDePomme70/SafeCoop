@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\SafeCoop\Protocol\SessionHello.cs" Link="SessionHello.cs" />
+    <Compile Include="..\SafeCoop\Protocol\SessionWireCodec.cs" Link="SessionWireCodec.cs" />
+    <Compile Include="..\SafeCoop\Protocol\SessionFrame.cs" Link="SessionFrame.cs" />
+    <Compile Include="..\SafeCoop\Protocol\SyncedCommand.cs" Link="SyncedCommand.cs" />
+    <Compile Include="..\SafeCoop\Transport\HandshakeTransport.cs" Link="HandshakeTransport.cs" />
+    <Compile Include="..\SafeCoop\Transport\LanPeerConnection.cs" Link="LanPeerConnection.cs" />
+  </ItemGroup>
+</Project>

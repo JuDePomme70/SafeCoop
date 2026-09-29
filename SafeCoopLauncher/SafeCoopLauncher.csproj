@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>SafeCoopLauncher</AssemblyName>
+    <RootNamespace>SafeCoopLauncher</RootNamespace>
+  </PropertyGroup>
+
+  <Target Name="BuildSafeCoop" BeforeTargets="Build" Condition="'$(RuntimeIdentifier)' == ''">
+    <MSBuild Projects="..\SafeCoop\SafeCoop.csproj" Targets="Build" Properties="Configuration=Release;COI_ROOT=$(COI_ROOT)" />
+  </Target>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\SafeCoop\bin\Release\net48\SafeCoop.dll" LogicalName="SafeCoopLauncher.Payload.SafeCoop.dll" />
+    <EmbeddedResource Include="..\SafeCoop\manifest.json" LogicalName="SafeCoopLauncher.Payload.manifest.json" />
+    <EmbeddedResource Include="..\SafeCoop\readme.txt" LogicalName="SafeCoopLauncher.Payload.readme.txt" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,19 @@
+# Build outputs and local packages
+**/bin/
+**/obj/
+**/publish*/
+**/package*/
+*.zip
+
+# Local Captain of Industry mod backups and personal session settings
+SafeCoop/installed-backups/
+SafeCoop/session-setup/
+private-download/
+
+# Editor and operating-system files
+.vs/
+.vscode/
+*.user
+*.pdb
+Thumbs.db
+Desktop.ini
